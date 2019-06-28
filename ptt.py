@@ -30,7 +30,7 @@ def send_ifttt(title_send,url_send):   # 定義函式來向 IFTTT 發送 HTTP �
     return r.text
 
 def get_topic_url(flag):
-    url = 'https://www.ptt.cc/bbs/sex/index.html'
+    url = 'https://www.ptt.cc/bbs/Gossiping/index.html'
     randomint = random.randint(0,7)
     user_agents = [
         'Mozilla/5.0 (Windows; U; Windows NT 5.1; it; rv:1.8.1.11) Gecko/20071127 Firefox/2.0.0.11',
@@ -57,10 +57,10 @@ def get_topic_url(flag):
     title=[]
     url=[]
     ptt_title = soup.find_all('div',{"class":"title"})
-    ptt_url = soup.find_all('a',attrs={'href':re.compile('^/bbs/sex/M')})
+    ptt_url = soup.find_all('a',attrs={'href':re.compile('^/bbs/Gossiping/M')})
         
     for content in ptt_title:  
-        if content.getText().find("[公告] 西斯板規") == -1:
+        if content.getText().find("[公告] 八卦板板規") == -1:
             if content.getText().find("(本文已被刪除)") == -1: 
                 per_title = content.getText()          
                 title.append(per_title)                
@@ -82,55 +82,62 @@ def get_topic_url(flag):
     elif ptt_title_len < 20:
         flag = 0
          
-    return flag,ptt_title_len,title,url        
+    return flag,title,url        
 
-def index_title(ptt_cout,ptt_title):
-    try:
-        ptt_cout = ptt_title.index(ptt_title[ptt_cout])
-    except ValueError:
-        ptt_cout-=1
-        ptt_cout = index_title(ptt_cout,ptt_title)
-        
-    return ptt_cout
-            
-def update(ptt_cout,ptt_title_len,ptt_title,ptt_url):    
+def position_start(ptt_old_title,ptt_title,old_pos):
+
+    if ptt_title[old_pos] == ptt_old_title[old_pos]:
+        pass
+    else:
+        old_pos-=1
+        old_pos = position_start(ptt_old_title,ptt_title,old_pos)
     
-    if ptt_title_len == ptt_cout:
+    return old_pos
+
+def update(ptt_old_title,ptt_new_title,old_pos,new_pos,ptt_new_url):
+    if old_pos == 19:
+        old_pos = 0
+    
+    if new_pos == old_pos:
         print("No Change")
-    elif ptt_title_len > ptt_cout:
-        #找old title 是否存在             
-        ptt_cout = index_title(ptt_cout,ptt_title)
-        
-        for i in range(ptt_cout,ptt_title_len):                
-            ret = send_ifttt(ptt_title[i],ptt_url[i])
+    elif new_pos > old_pos:
+        old_pos = position_start(ptt_old_title,ptt_new_title,old_pos)
+        start = old_pos+1
+        end = new_pos+1
+        for i in range(start,end):                
+            ret = send_ifttt(ptt_new_title[i],ptt_new_url[i])
             print('IFTTT sent:', ret) 
-        ptt_cout = ptt_title_len
-        print(ptt_cout)
-    else :
-        ptt_cout = 0
-        ptt_cout = update(ptt_cout,ptt_title_len,ptt_title,ptt_url)
+        ptt_old_title = ptt_new_title    
+        old_pos = new_pos
+        print(end)
+    else:
+        old_pos = 0
+        ptt_old_title,old_pos = update(ptt_old_title,ptt_new_title,old_pos,new_pos,ptt_new_url)
     
-    if ptt_cout == 20:
-        ptt_cout = 0
-    
-    return ptt_cout
-    
+
+        
+    return ptt_old_title,old_pos
     
 if __name__ == '__main__':
     
     sleeptime = 10
-    ptt_title=[]
-    ptt_url=[]
-    ptt_cout=0
-    ptt_title_len=0
+    ptt_new_title=[]
+    ptt_new_url=[]
+    ptt_old_title=[]
+    ptt_old_url=[]        
     flag = 0     
-
+    
+    flag,ptt_old_title,ptt_old_url = get_topic_url(flag)
+    old_pos = len(ptt_old_title)-1  
+    for i in range(len(ptt_old_title)):
+        ret = send_ifttt(ptt_old_title[i],ptt_old_url[i])        
+    print(len(ptt_old_title))
     while 1:
-        flag,ptt_title_len,ptt_title,ptt_url = get_topic_url(flag)
+        flag,ptt_new_title,ptt_new_url = get_topic_url(flag)
+        new_pos = len(ptt_new_title)-1  
         if flag < 2:
-            ptt_cout = update(ptt_cout,ptt_title_len,ptt_title,ptt_url)
             cur_time()
-            
+            ptt_old_title,old_pos = update(ptt_old_title,ptt_new_title,old_pos,new_pos,ptt_new_url)                        
         else:
             cur_time()
             print("No Change")
