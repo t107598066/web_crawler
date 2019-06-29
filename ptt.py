@@ -56,67 +56,61 @@ def get_topic_url(flag):
     
     title=[]
     url=[]
+    matrix= [[],[]]
     ptt_title = soup.find_all('div',{"class":"title"})
     ptt_url = soup.find_all('a',attrs={'href':re.compile('^/bbs/Gossiping/M')})
         
-    for content in ptt_title:  
+    for content in ptt_title:         
         if content.getText().find("[公告] 八卦板板規") == -1:
-            if content.getText().find("(本文已被刪除)") == -1: 
-                per_title = content.getText()          
-                title.append(per_title)                
-            else:
-                pass                
+            per_title = content.getText()          
+            title.append(per_title) 
         else:
             break
         
-    for index,link in enumerate(ptt_url[:len(title)]): 
-        if title[index].find("(本文已被刪除)") != -1: 
-            pass
+    for content in ptt_url[:len(title)]:
+        per_url = content.get('href') 
+        url.append(per_url)        
+                   
+    for index,content in enumerate(title):    
+        if content.find('(本文已被刪除)')==-1:
+            matrix[0].append(content)
+            matrix[1].append('https://www.ptt.cc' + url[index])
         else:
-            url.append('https://www.ptt.cc' + link.get('href'))        
-        
-    ptt_title_len = len(title)
-    
-    if ptt_title_len == 20:
+            matrix[0].append(content)
+            matrix[1].append('')
+            
+    if len(matrix[0]) == 20:
         flag += 1 
-    elif ptt_title_len < 20:
+    elif len(matrix[0]) < 20:
         flag = 0
-         
-    return flag,title,url        
-
-def position_start(ptt_old_title,ptt_title,old_pos):
-
-    if ptt_title[old_pos] == ptt_old_title[old_pos]:
-        pass
-    else:
-        old_pos-=1
-        old_pos = position_start(ptt_old_title,ptt_title,old_pos)
-    
-    return old_pos
-
-def update(ptt_old_title,ptt_new_title,old_pos,new_pos,ptt_new_url):
-    if old_pos == 19:
-        old_pos = 0
-    
-    if new_pos == old_pos:
-        print("No Change")
-    elif new_pos > old_pos:
-        old_pos = position_start(ptt_old_title,ptt_new_title,old_pos)
-        start = old_pos+1
-        end = new_pos+1
-        for i in range(start,end):                
-            ret = send_ifttt(ptt_new_title[i],ptt_new_url[i])
-            print('IFTTT sent:', ret) 
-        ptt_old_title = ptt_new_title    
-        old_pos = new_pos
-        print(end)
-    else:
-        old_pos = 0
-        ptt_old_title,old_pos = update(ptt_old_title,ptt_new_title,old_pos,new_pos,ptt_new_url)
-    
-
+            
+    return flag,matrix
         
-    return ptt_old_title,old_pos
+def update(old_matrix,new_matrix):
+    old_len = len(old_matrix[0])
+    new_len = len(new_matrix[0])
+    start = old_len
+    end = new_len
+    
+    if  new_len == old_len:
+        print("No Change")
+    elif new_len > old_len:        
+        for i in range(start,end):     
+            if new_matrix[0][i].find('(本文已被刪除)') == -1:          
+                ret = send_ifttt(new_matrix[0][i],new_matrix[1][i])
+                print('IFTTT sent:', ret) 
+            else:
+                pass  
+            
+        old_matrix = new_matrix        
+        print(len(old_matrix[0]))        
+    else:
+        for i in range(new_len):
+            ret = send_ifttt(new_matrix[0][i],new_matrix[1][i])
+            print('IFTTT sent:', ret)   
+        old_matrix = new_matrix
+        
+    return old_matrix
     
 if __name__ == '__main__':
     
@@ -126,20 +120,26 @@ if __name__ == '__main__':
     ptt_old_title=[]
     ptt_old_url=[]        
     flag = 0     
+    old_matrix = [[],[]]
+    new_matrix = [[],[]]
+
     
-    flag,ptt_old_title,ptt_old_url = get_topic_url(flag)
-    old_pos = len(ptt_old_title)-1  
-    for i in range(len(ptt_old_title)):
-        ret = send_ifttt(ptt_old_title[i],ptt_old_url[i])        
-    print(len(ptt_old_title))
-    while 1:
-        flag,ptt_new_title,ptt_new_url = get_topic_url(flag)
-        new_pos = len(ptt_new_title)-1  
+    flag,old_matrix = get_topic_url(flag)
+    for i in range(len(old_matrix[0])):
+        if old_matrix[0][i].find('(本文已被刪除)') == -1: 
+            ret = send_ifttt(old_matrix[0][i],old_matrix[1][i])
+            print('IFTTT sent:', ret) 
+            
+        else:
+            pass
+    print(len(old_matrix[0]))
+    while 1 :
         if flag < 2:
+            flag,new_matrix = get_topic_url(flag)
+            old_matrix = update(old_matrix,new_matrix)
             cur_time()
-            ptt_old_title,old_pos = update(ptt_old_title,ptt_new_title,old_pos,new_pos,ptt_new_url)                        
         else:
             cur_time()
+            flag,new_matrix = get_topic_url(flag)
             print("No Change")
         time.sleep(sleeptime)
-
